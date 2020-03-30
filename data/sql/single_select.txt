@@ -1,0 +1,51 @@
+/* 이것은 설명 */
+			SELECT 	R.SEQ, R.CHARGE_TYPE, R.GRP_NO, R.V_CD, R.V_NO
+					-- A CHARGE
+					-- A CHARGE는 GROUP별로 구한다.
+					, ROW_NUMBER() OVER(PARTITION BY R.SEQ, R.GRP_NO ORDER BY AMT DESC) AS RN_PC_MAX
+					, ROW_NUMBER() OVER(PARTITION BY R.SEQ, R.GRP_NO ORDER BY AMT ASC) 	AS RN_PC_MIN
+					-- B CHARGE
+					, ROW_NUMBER() OVER(PARTITION BY R.SEQ ORDER BY AMT DESC) 				AS RN_CG_MAX
+					, ROW_NUMBER() OVER(PARTITION BY R.SEQ ORDER BY AMT ASC) 				AS RN_CG_MIN
+			FROM	(	
+				SELECT	X.SEQ, X.CHARGE_TYPE, X.V_CD, X.V_NO, X.GRP_NO
+						-- 
+						, SUM(ISNULL(X.TOT_AMT,0)) 	
+								OVER(PARTITION BY X.SEQ, X.CHARGE_TYPE, X.GRP_NO, X.V_CD, X.V_NO) AS AMT
+				FROM (
+						SELECT	C.SEQ, D.V_CD, D.V_NO, CB.GRP_NO, D.P_CD
+								, C.CHARGE_CD AS CHARGE_TYPE
+                                /***
+								-- 금액 구하기 
+                                ***/
+								, CASE 
+									WHEN D.LCL_CURR_CD IN ('KRW','USD','CNY','JPY') THEN
+										CASE
+											WHEN D.S_CURR_CD = 'KRW' 	THEN D.STL_AMT / @KRW_USD_RATE
+											WHEN D.S_CURR_CD = 'USD' 	THEN D.STL_AMT
+											WHEN D.S_CURR_CD = 'CNY' 	THEN D.STL_AMT * @CNY_USD_RATE
+											WHEN D.S_CURR_CD = 'JPY' 	THEN D.STL_AMT * @JPY_USD_RATE
+										END
+									ELSE	D.KRW_AMT / @KRW_USD_RATE
+								END AS TOT_AMT
+						        , D.CD_SID
+						FROM	TBL1 C  					WITH(NOLOCK)
+									INNER JOIN TBL2 CD  			WITH(NOLOCK)
+										ON	CD.CHRG_TYPE= C.CHARGE_CD
+									INNER JOIN TBL3 XC	 		WITH(NOLOCK)
+										ON XC.CD_ID 	= CD.CHRG_CD
+										AND	XC.CD		IS NOT NULL
+									INNER JOIN	DB_NM.DBO.TBL4 D	 WITH(NOLOCK)
+										ON 	D.P_CD	= C.P_CD
+									INNER JOIN DB_NM.DBO.TBL5 CM	 WITH(NOLOCK)
+										ON 	CM.CD_SID = D.CD_SID
+										AND	CM.JICHULNO > '0'
+									INNER JOIN DB_NM.DBO.TBL6 VM	 WITH(NOLOCK)
+										ON	VM.VU_NO = CM.VU_NO
+									INNER JOIN DB_NM.DBO.TBL7 CB	 WITH(NOLOCK)
+										ON  CB.V_CD	= VM.V_CD
+										AND	CB.RESULTS_DAT BETWEEN 	CONVERT(VARCHAR(6), DATEADD(MM, -12 * @YEAR - 1 , GETDATE()), 112) 
+											 	AND 	CONVERT(VARCHAR(6), DATEADD(MM, -2 , GETDATE()), 112) 
+						WHERE	C.CO_NO = @CO_NO
+					) X
+			) R
