@@ -1,2 +1,8 @@
 
 data/naver/ratings_train.txt
+data/naver/10.3.ratings.txt
+data/word_embedding/ko.bin
+data/word_embedding/ko.tsv
+data/word_embedding/ted_en-20160408.xml
+data/kaggle/amazon-fine-food-reviews.csv
+data/word_embedding/GoogleNews-vectors-negative300.bin
